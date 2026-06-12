@@ -70,6 +70,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Flight")
 	float MinSpeed = 500.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Flight")
+	float MousePitchSensitivity = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Flight")
+	float MouseYawSensitivity = 10.0f;
+
 private:
 	// Input handlers
 	void HandleThrottle(const FInputActionValue& Value);
@@ -77,6 +83,16 @@ private:
 	void HandleYaw(const FInputActionValue& Value);
 	void HandleRoll(const FInputActionValue& Value);
 
+	void ResetThrottle(const FInputActionValue& Value);
+	void ResetPitch(const FInputActionValue& Value);
+	void ResetYaw(const FInputActionValue& Value);
+	void ResetRoll(const FInputActionValue& Value);
+
+public:
+	UFUNCTION(BlueprintCallable, Category = "Flight")
+	float GetCurrentSpeed() const { return CurrentSpeed; }
+
+private:
 	// Current state
 	float CurrentSpeed = 0.0f;
 	float ThrottleInput = 0.0f;
