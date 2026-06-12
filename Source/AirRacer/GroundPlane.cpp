@@ -30,10 +30,14 @@ void AGroundPlane::BeginPlay()
 		SetActorScale3D(FVector(500.0f, 500.0f, 0.01f));
 
 		// Green ground material
-		UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(
-			MeshComp->GetMaterial(0), this);
-		Mat->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.15f, 0.45f, 0.1f));
-		MeshComp->SetMaterial(0, Mat);
+		UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr,
+			TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+		if (BaseMat)
+		{
+			UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(BaseMat, this);
+			Mat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.15f, 0.45f, 0.1f));
+			MeshComp->SetMaterial(0, Mat);
+		}
 
 		UE_LOG(LogTemp, Warning, TEXT("GroundPlane: Mesh set OK, Location=%s Scale=%s"),
 			*GetActorLocation().ToString(), *GetActorScale3D().ToString());

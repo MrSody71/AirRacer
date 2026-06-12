@@ -187,10 +187,14 @@ UStaticMeshComponent* AAirplanePawn::CreatePart(const FName& Name, UStaticMesh* 
 	Comp->SetRelativeScale3D(Scale);
 	Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(
-		Comp->GetMaterial(0), this);
-	Mat->SetVectorParameterValue(TEXT("BaseColor"), Color);
-	Comp->SetMaterial(0, Mat);
+	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	if (BaseMat)
+	{
+		UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(BaseMat, this);
+		Mat->SetVectorParameterValue(TEXT("Color"), Color);
+		Comp->SetMaterial(0, Mat);
+	}
 
 	Comp->RegisterComponent();
 	return Comp;

@@ -58,10 +58,14 @@ void ACheckpointActor::BeginPlay()
 			SphereComp->SetRelativeScale3D(FVector(1.5f, 1.5f, 1.5f));
 			SphereComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-			UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(
-				SphereComp->GetMaterial(0), this);
-			Mat->SetVectorParameterValue(TEXT("BaseColor"), InactiveColor);
-			SphereComp->SetMaterial(0, Mat);
+			UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr,
+				TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+			if (BaseMat)
+			{
+				UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(BaseMat, this);
+				Mat->SetVectorParameterValue(TEXT("Color"), InactiveColor);
+				SphereComp->SetMaterial(0, Mat);
+			}
 
 			SphereComp->RegisterComponent();
 			GateSpheres.Add(SphereComp);
@@ -97,7 +101,7 @@ void ACheckpointActor::SetHighlight(bool bActive)
 			UMaterialInstanceDynamic* Mat = Cast<UMaterialInstanceDynamic>(Sphere->GetMaterial(0));
 			if (Mat)
 			{
-				Mat->SetVectorParameterValue(TEXT("BaseColor"), Color);
+				Mat->SetVectorParameterValue(TEXT("Color"), Color);
 			}
 		}
 	}
