@@ -6,12 +6,11 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
+#include "Kismet/GameplayStatics.h"
 
 AAirRaceGameMode::AAirRaceGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	// Do NOT set DefaultPawnClass — BP_Airplane is placed in the level
-	// with Auto Possess Player 0, setting this spawns a duplicate pawn
 	DefaultPawnClass = nullptr;
 	HUDClass = ARaceHUD::StaticClass();
 }
@@ -25,22 +24,80 @@ void AAirRaceGameMode::BeginPlay()
 	LapStartTime = 0.0f;
 	bRaceFinished = false;
 	BestLapTime = 0.0f;
+	RaceState = ERaceState::MainMenu;
 
 	CollectCheckpoints();
 	SpawnGroundPlane();
 
-	// Delay highlight update by 1 frame so checkpoints finish their BeginPlay first
 	GetWorldTimerManager().SetTimerForNextTick(this, &AAirRaceGameMode::UpdateCheckpointHighlights);
+
+	// Show main menu: pause game, show cursor
+	UGameplayStatics::SetGamePaused(GetWorld(), true);
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC)
+	{
+		PC->bShowMouseCursor = true;
+		PC->SetInputMode(FInputModeGameAndUI());
+	}
 }
 
 void AAirRaceGameMode::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!bRaceFinished)
+	if (RaceState == ERaceState::Racing)
 	{
 		RaceTime += DeltaTime;
 	}
+}
+
+void AAirRaceGameMode::StartRace()
+{
+	RaceState = ERaceState::Racing;
+	UGameplayStatics::SetGamePaused(GetWorld(), false);
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC)
+	{
+		PC->bShowMouseCursor = false;
+		PC->SetInputMode(FInputModeGameOnly());
+	}
+}
+
+void AAirRaceGameMode::TogglePause()
+{
+	if (RaceState == ERaceState::Racing)
+	{
+		RaceState = ERaceState::Paused;
+		UGameplayStatics::SetGamePaused(GetWorld(), true);
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		if (PC)
+		{
+			PC->bShowMouseCursor = true;
+			PC->SetInputMode(FInputModeGameAndUI());
+		}
+	}
+	else if (RaceState == ERaceState::Paused)
+	{
+		RaceState = ERaceState::Racing;
+		UGameplayStatics::SetGamePaused(GetWorld(), false);
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		if (PC)
+		{
+			PC->bShowMouseCursor = false;
+			PC->SetInputMode(FInputModeGameOnly());
+		}
+	}
+}
+
+void AAirRaceGameMode::RestartRace()
+{
+	UGameplayStatics::OpenLevel(GetWorld(), FName(*GetWorld()->GetName()));
+}
+
+void AAirRaceGameMode::QuitGame()
+{
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	UKismetSystemLibrary::QuitGame(GetWorld(), PC, EQuitPreference::Quit, false);
 }
 
 void AAirRaceGameMode::OnCheckpointReached(AAirplanePawn* Plane, int32 CheckpointIndex)
@@ -55,14 +112,11 @@ void AAirRaceGameMode::OnCheckpointReached(AAirplanePawn* Plane, int32 Checkpoin
 
 	if (NextCheckpointIndex >= TotalCheckpoints)
 	{
-		// Lap completed
 		float LapTime = RaceTime - LapStartTime;
 		if (BestLapTime <= 0.0f || LapTime < BestLapTime)
 		{
 			BestLapTime = LapTime;
 		}
-
-		UE_LOG(LogTemp, Warning, TEXT("Lap %d complete! Time: %.2f s"), CurrentLap, LapTime);
 
 		CurrentLap++;
 		NextCheckpointIndex = 0;
@@ -71,7 +125,14 @@ void AAirRaceGameMode::OnCheckpointReached(AAirplanePawn* Plane, int32 Checkpoin
 		if (CurrentLap > TotalLaps)
 		{
 			bRaceFinished = true;
-			UE_LOG(LogTemp, Warning, TEXT("Race finished! Total time: %.2f s, Best lap: %.2f s"), RaceTime, BestLapTime);
+			RaceState = ERaceState::Finished;
+
+			APlayerController* PC = GetWorld()->GetFirstPlayerController();
+			if (PC)
+			{
+				PC->bShowMouseCursor = true;
+				PC->SetInputMode(FInputModeGameAndUI());
+			}
 		}
 	}
 
@@ -86,20 +147,10 @@ void AAirRaceGameMode::CollectCheckpoints()
 		Checkpoints.Add(*It);
 	}
 
-	// Sort by CheckpointIndex
 	Checkpoints.Sort([](const ACheckpointActor& A, const ACheckpointActor& B)
 	{
 		return A.CheckpointIndex < B.CheckpointIndex;
 	});
-
-	UE_LOG(LogTemp, Warning, TEXT("Collected %d checkpoints"), Checkpoints.Num());
-	for (ACheckpointActor* CP : Checkpoints)
-	{
-		if (CP)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("  Checkpoint %d at %s"), CP->CheckpointIndex, *CP->GetActorLocation().ToString());
-		}
-	}
 }
 
 void AAirRaceGameMode::UpdateCheckpointHighlights()
@@ -121,15 +172,5 @@ void AAirRaceGameMode::SpawnGroundPlane()
 
 	FVector Location(0.0f, 0.0f, 0.0f);
 	FRotator Rotation = FRotator::ZeroRotator;
-
-	AGroundPlane* Ground = World->SpawnActor<AGroundPlane>(Location, Rotation);
-	if (Ground)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Ground plane spawned at %s, Scale=%s"),
-			*Ground->GetActorLocation().ToString(), *Ground->GetActorScale3D().ToString());
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to spawn GroundPlane!"));
-	}
+	World->SpawnActor<AGroundPlane>(Location, Rotation);
 }

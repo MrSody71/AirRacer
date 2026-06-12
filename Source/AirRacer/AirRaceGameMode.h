@@ -7,6 +7,15 @@
 class AAirplanePawn;
 class ACheckpointActor;
 
+UENUM()
+enum class ERaceState : uint8
+{
+	MainMenu,
+	Racing,
+	Paused,
+	Finished
+};
+
 UCLASS()
 class AIRRACER_API AAirRaceGameMode : public AGameModeBase
 {
@@ -37,6 +46,13 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Race")
 	float BestLapTime = 0.0f;
+
+	ERaceState RaceState = ERaceState::MainMenu;
+
+	void StartRace();
+	void TogglePause();
+	void RestartRace();
+	void QuitGame();
 
 protected:
 	virtual void BeginPlay() override;

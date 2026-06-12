@@ -2,6 +2,13 @@
 #include "Engine/Canvas.h"
 #include "AirRaceGameMode.h"
 #include "AirplanePawn.h"
+#include "GameFramework/PlayerController.h"
+
+void ARaceHUD::BeginPlay()
+{
+	Super::BeginPlay();
+	bShowHUD = true;
+}
 
 void ARaceHUD::DrawHUD()
 {
@@ -11,18 +18,234 @@ void ARaceHUD::DrawHUD()
 		return;
 
 	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
+	if (!GM)
+		return;
+
+	// Get mouse state
+	APlayerController* PC = GetOwningPlayerController();
+	if (PC)
+	{
+		PC->GetMousePosition(MouseX, MouseY);
+		bMousePressed = PC->WasInputKeyJustPressed(EKeys::LeftMouseButton);
+	}
+
+	switch (GM->RaceState)
+	{
+	case ERaceState::MainMenu:
+		DrawMainMenu();
+		break;
+	case ERaceState::Racing:
+		DrawRaceHUD();
+		break;
+	case ERaceState::Paused:
+		DrawRaceHUD();
+		DrawPauseMenu();
+		break;
+	case ERaceState::Finished:
+		DrawRaceHUD();
+		DrawFinishScreen();
+		break;
+	}
+}
+
+void ARaceHUD::DrawMainMenu()
+{
+	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
+	const float ScreenW = Canvas->SizeX;
+	const float ScreenH = Canvas->SizeY;
+	UFont* Font = GEngine->GetLargeFont();
+
+	// Dark background
+	DrawBackground(0, 0, ScreenW, ScreenH, 0.7f);
+
+	// Title
+	FString Title = TEXT("AIR RACER");
+	float TW, TH;
+	Canvas->StrLen(Font, Title, TW, TH);
+	float Scale = 3.0f;
+
+	FCanvasTextItem TitleItem(
+		FVector2D((ScreenW - TW * Scale) * 0.5f, ScreenH * 0.2f),
+		FText::FromString(Title), Font, FLinearColor(1.0f, 0.9f, 0.1f));
+	TitleItem.Scale = FVector2D(Scale, Scale);
+	Canvas->DrawItem(TitleItem);
+
+	// Buttons
+	float BtnW = 250.0f, BtnH = 55.0f;
+	float BtnX = (ScreenW - BtnW) * 0.5f;
+
+	if (DrawButton(TEXT("PLAY"), BtnX, ScreenH * 0.5f, BtnW, BtnH, Font))
+	{
+		if (GM) GM->StartRace();
+	}
+
+	if (DrawButton(TEXT("QUIT"), BtnX, ScreenH * 0.5f + 80.0f, BtnW, BtnH, Font))
+	{
+		if (GM) GM->QuitGame();
+	}
+}
+
+void ARaceHUD::DrawPauseMenu()
+{
+	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
+	const float ScreenW = Canvas->SizeX;
+	const float ScreenH = Canvas->SizeY;
+	UFont* Font = GEngine->GetLargeFont();
+
+	DrawBackground(0, 0, ScreenW, ScreenH, 0.5f);
+
+	FString Title = TEXT("PAUSED");
+	float TW, TH;
+	Canvas->StrLen(Font, Title, TW, TH);
+	float Scale = 2.0f;
+
+	FCanvasTextItem TitleItem(
+		FVector2D((ScreenW - TW * Scale) * 0.5f, ScreenH * 0.3f),
+		FText::FromString(Title), Font, FLinearColor::White);
+	TitleItem.Scale = FVector2D(Scale, Scale);
+	Canvas->DrawItem(TitleItem);
+
+	float BtnW = 250.0f, BtnH = 55.0f;
+	float BtnX = (ScreenW - BtnW) * 0.5f;
+
+	if (DrawButton(TEXT("RESUME"), BtnX, ScreenH * 0.5f, BtnW, BtnH, Font))
+	{
+		if (GM) GM->TogglePause();
+	}
+
+	if (DrawButton(TEXT("QUIT"), BtnX, ScreenH * 0.5f + 80.0f, BtnW, BtnH, Font))
+	{
+		if (GM) GM->QuitGame();
+	}
+}
+
+void ARaceHUD::DrawFinishScreen()
+{
+	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
+	const float ScreenW = Canvas->SizeX;
+	const float ScreenH = Canvas->SizeY;
+	UFont* Font = GEngine->GetLargeFont();
+	UFont* SmallFont = GEngine->GetSmallFont();
+
+	DrawBackground(0, 0, ScreenW, ScreenH, 0.6f);
+
+	// Title
+	FString Title = TEXT("RACE FINISHED!");
+	float TW, TH;
+	Canvas->StrLen(Font, Title, TW, TH);
+	float Scale = 2.5f;
+
+	FCanvasTextItem TitleItem(
+		FVector2D((ScreenW - TW * Scale) * 0.5f, ScreenH * 0.15f),
+		FText::FromString(Title), Font, FLinearColor(1.0f, 0.9f, 0.1f));
+	TitleItem.Scale = FVector2D(Scale, Scale);
+	Canvas->DrawItem(TitleItem);
+
+	// Results
+	auto FormatTime = [](float Time) -> FString
+	{
+		int32 Min = FMath::FloorToInt(Time / 60.0f);
+		int32 Sec = FMath::FloorToInt(FMath::Fmod(Time, 60.0f));
+		int32 Ms = FMath::FloorToInt(FMath::Fmod(Time * 100.0f, 100.0f));
+		return FString::Printf(TEXT("%02d:%02d.%02d"), Min, Sec, Ms);
+	};
+
+	float InfoScale = 1.5f;
+
+	FString TotalText = FString::Printf(TEXT("Total Time:  %s"), *FormatTime(GM->RaceTime));
+	float TTW, TTH;
+	Canvas->StrLen(Font, TotalText, TTW, TTH);
+	FCanvasTextItem TotalItem(
+		FVector2D((ScreenW - TTW * InfoScale) * 0.5f, ScreenH * 0.4f),
+		FText::FromString(TotalText), Font, FLinearColor::White);
+	TotalItem.Scale = FVector2D(InfoScale, InfoScale);
+	Canvas->DrawItem(TotalItem);
+
+	FString BestText = FString::Printf(TEXT("Best Lap:  %s"), *FormatTime(GM->BestLapTime));
+	float BTW, BTH;
+	Canvas->StrLen(Font, BestText, BTW, BTH);
+	FCanvasTextItem BestItem(
+		FVector2D((ScreenW - BTW * InfoScale) * 0.5f, ScreenH * 0.4f + TTH * InfoScale + 15.0f),
+		FText::FromString(BestText), Font, FLinearColor(0.2f, 1.0f, 0.3f));
+	BestItem.Scale = FVector2D(InfoScale, InfoScale);
+	Canvas->DrawItem(BestItem);
+
+	// Buttons
+	float BtnW = 250.0f, BtnH = 55.0f;
+	float BtnX = (ScreenW - BtnW) * 0.5f;
+
+	if (DrawButton(TEXT("RESTART"), BtnX, ScreenH * 0.7f, BtnW, BtnH, Font))
+	{
+		if (GM) GM->RestartRace();
+	}
+
+	if (DrawButton(TEXT("QUIT"), BtnX, ScreenH * 0.7f + 80.0f, BtnW, BtnH, Font))
+	{
+		if (GM) GM->QuitGame();
+	}
+}
+
+bool ARaceHUD::DrawButton(const FString& Text, float X, float Y, float W, float H, UFont* Font)
+{
+	bool bHovered = IsMouseInRect(X, Y, W, H);
+	bool bClicked = bHovered && bMousePressed;
+
+	FLinearColor BgColor = bHovered
+		? FLinearColor(0.3f, 0.3f, 0.4f, 0.9f)
+		: FLinearColor(0.15f, 0.15f, 0.2f, 0.8f);
+
+	FCanvasTileItem Bg(FVector2D(X, Y), FVector2D(W, H), BgColor);
+	Bg.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Bg);
+
+	// Border
+	float Border = 2.0f;
+	FLinearColor BorderColor = bHovered
+		? FLinearColor(1.0f, 0.9f, 0.1f, 1.0f)
+		: FLinearColor(0.5f, 0.5f, 0.5f, 0.8f);
+
+	FCanvasTileItem Top(FVector2D(X, Y), FVector2D(W, Border), BorderColor);
+	Top.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Top);
+	FCanvasTileItem Bottom(FVector2D(X, Y + H - Border), FVector2D(W, Border), BorderColor);
+	Bottom.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Bottom);
+	FCanvasTileItem Left(FVector2D(X, Y), FVector2D(Border, H), BorderColor);
+	Left.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Left);
+	FCanvasTileItem Right(FVector2D(X + W - Border, Y), FVector2D(Border, H), BorderColor);
+	Right.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Right);
+
+	// Text centered
+	float TextW, TextH;
+	Canvas->StrLen(Font, Text, TextW, TextH);
+	FCanvasTextItem TextItem(
+		FVector2D(X + (W - TextW) * 0.5f, Y + (H - TextH) * 0.5f),
+		FText::FromString(Text), Font, FLinearColor::White);
+	Canvas->DrawItem(TextItem);
+
+	return bClicked;
+}
+
+bool ARaceHUD::IsMouseInRect(float X, float Y, float W, float H) const
+{
+	return MouseX >= X && MouseX <= X + W && MouseY >= Y && MouseY <= Y + H;
+}
+
+void ARaceHUD::DrawRaceHUD()
+{
+	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
 	AAirplanePawn* Plane = Cast<AAirplanePawn>(GetOwningPawn());
 	if (!GM || !Plane)
 		return;
 
 	const float ScreenW = Canvas->SizeX;
 	const float ScreenH = Canvas->SizeY;
-
-	// Use default engine font (robust, always available)
 	UFont* Font = GEngine->GetLargeFont();
 	UFont* SmallFont = GEngine->GetSmallFont();
 
-	// === Top-left panel: Lap & Checkpoint ===
+	// Top-left: Lap & Checkpoint
 	{
 		const float PanelX = 20.0f;
 		const float PanelY = 20.0f;
@@ -38,7 +261,7 @@ void ARaceHUD::DrawHUD()
 		Canvas->DrawText(SmallFont, CheckpointText, PanelX + 15.0f, PanelY + 42.0f);
 	}
 
-	// === Top-center: Race Timer ===
+	// Top-center: Race Timer
 	{
 		int32 Minutes = FMath::FloorToInt(GM->RaceTime / 60.0f);
 		int32 Seconds = FMath::FloorToInt(FMath::Fmod(GM->RaceTime, 60.0f));
@@ -58,7 +281,7 @@ void ARaceHUD::DrawHUD()
 		Canvas->DrawText(Font, TimeText, PanelX + 20.0f, PanelY + 10.0f);
 	}
 
-	// === Top-right: Best Lap ===
+	// Top-right: Best Lap
 	if (GM->BestLapTime > 0.0f)
 	{
 		int32 BMinutes = FMath::FloorToInt(GM->BestLapTime / 60.0f);
@@ -79,10 +302,9 @@ void ARaceHUD::DrawHUD()
 		Canvas->DrawText(Font, BestText, PanelX + 20.0f, PanelY + 10.0f);
 	}
 
-	// === Bottom-center: Speed ===
+	// Bottom-center: Speed
 	{
 		float Speed = Plane->GetCurrentSpeed();
-		// Convert UU/s to a display value (divide by 100 for ~m/s feel)
 		int32 DisplaySpeed = FMath::RoundToInt(Speed / 100.0f);
 		FString SpeedText = FString::Printf(TEXT("%d"), DisplaySpeed);
 		FString UnitText = TEXT("km/h");
@@ -105,37 +327,10 @@ void ARaceHUD::DrawHUD()
 		Canvas->DrawColor = FColor(180, 180, 180);
 		Canvas->DrawText(SmallFont, UnitText, PanelX + (PanelW - UnitW) * 0.5f, PanelY + SpeedH + 8.0f);
 	}
-
-	// === Race Finished overlay ===
-	if (GM->bRaceFinished)
-	{
-		FString FinishText = TEXT("RACE FINISHED!");
-		float TextW = 0.0f, TextH = 0.0f;
-		Canvas->StrLen(Font, FinishText, TextW, TextH);
-
-		float Scale = 2.0f;
-		float ScaledW = TextW * Scale;
-		float ScaledH = TextH * Scale;
-
-		DrawBackground((ScreenW - ScaledW - 40.0f) * 0.5f, (ScreenH - ScaledH - 20.0f) * 0.5f, ScaledW + 40.0f, ScaledH + 20.0f, 0.7f);
-
-		Canvas->DrawColor = FColor::Yellow;
-		FCanvasTextItem TextItem(
-			FVector2D((ScreenW - ScaledW) * 0.5f, (ScreenH - ScaledH) * 0.5f),
-			FText::FromString(FinishText),
-			Font,
-			FLinearColor::Yellow
-		);
-		TextItem.Scale = FVector2D(Scale, Scale);
-		Canvas->DrawItem(TextItem);
-	}
 }
 
 void ARaceHUD::DrawBackground(float X, float Y, float Width, float Height, float Opacity)
 {
-	FLinearColor BgColor(0.0f, 0.0f, 0.0f, Opacity);
-	Canvas->DrawColor = BgColor.ToFColor(true);
-
 	FCanvasTileItem TileItem(
 		FVector2D(X, Y),
 		FVector2D(Width, Height),
