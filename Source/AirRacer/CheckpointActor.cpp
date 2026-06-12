@@ -4,6 +4,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 ACheckpointActor::ACheckpointActor()
 {
@@ -36,13 +37,14 @@ void ACheckpointActor::BeginPlay()
 		Comp->SetVisibility(false);
 	}
 
-	// Create gate ring from spheres dynamically (Blueprint can't override this)
+	// Create gate ring from spheres dynamically
 	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (SphereMesh)
 	{
-		// Create a ring of spheres to form a visible gate
 		const int32 NumSpheres = 12;
 		const float RingRadius = 600.0f;
+		FLinearColor InactiveColor(0.4f, 0.4f, 0.45f); // серый
+
 		for (int32 i = 0; i < NumSpheres; i++)
 		{
 			float Angle = (2.0f * PI * i) / NumSpheres;
@@ -55,7 +57,14 @@ void ACheckpointActor::BeginPlay()
 			SphereComp->SetRelativeLocation(Offset);
 			SphereComp->SetRelativeScale3D(FVector(1.5f, 1.5f, 1.5f));
 			SphereComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+			UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(
+				SphereComp->GetMaterial(0), this);
+			Mat->SetVectorParameterValue(TEXT("BaseColor"), InactiveColor);
+			SphereComp->SetMaterial(0, Mat);
+
 			SphereComp->RegisterComponent();
+			GateSpheres.Add(SphereComp);
 		}
 	}
 
@@ -75,6 +84,22 @@ void ACheckpointActor::SetHighlight(bool bActive)
 	if (HighlightLight)
 	{
 		HighlightLight->SetVisibility(bActive);
+	}
+
+	FLinearColor Color = bActive
+		? FLinearColor(0.0f, 1.0f, 0.2f)   // зелёный
+		: FLinearColor(0.4f, 0.4f, 0.45f);  // серый
+
+	for (UStaticMeshComponent* Sphere : GateSpheres)
+	{
+		if (Sphere)
+		{
+			UMaterialInstanceDynamic* Mat = Cast<UMaterialInstanceDynamic>(Sphere->GetMaterial(0));
+			if (Mat)
+			{
+				Mat->SetVectorParameterValue(TEXT("BaseColor"), Color);
+			}
+		}
 	}
 }
 

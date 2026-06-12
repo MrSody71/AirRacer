@@ -39,4 +39,7 @@ protected:
 private:
 	UPROPERTY()
 	UPointLightComponent* HighlightLight = nullptr;
+
+	UPROPERTY()
+	TArray<UStaticMeshComponent*> GateSpheres;
 };
