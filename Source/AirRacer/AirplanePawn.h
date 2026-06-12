@@ -51,6 +51,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	UInputAction* RollAction;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UInputAction* PauseAction;
+
 	// --- Flight Parameters ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Flight")
 	float MaxSpeed = 3000.0f;
@@ -87,6 +90,12 @@ private:
 	void ResetPitch(const FInputActionValue& Value);
 	void ResetYaw(const FInputActionValue& Value);
 	void ResetRoll(const FInputActionValue& Value);
+
+	void BuildAirplaneVisual();
+	UStaticMeshComponent* CreatePart(const FName& Name, UStaticMesh* Mesh,
+		const FVector& Location, const FRotator& Rotation, const FVector& Scale, const FLinearColor& Color);
+
+	void HandlePause(const FInputActionValue& Value);
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Flight")

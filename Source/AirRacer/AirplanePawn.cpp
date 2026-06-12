@@ -4,6 +4,8 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "AirRaceGameMode.h"
 
 AAirplanePawn::AAirplanePawn()
 {
@@ -50,31 +52,11 @@ void AAirplanePawn::BeginPlay()
 
 	CurrentSpeed = MinSpeed;
 
-	// Capture mouse for flight control
-	if (APlayerController* PC = Cast<APlayerController>(Controller))
-	{
-		PC->bShowMouseCursor = false;
-		PC->SetInputMode(FInputModeGameOnly());
-	}
-
-	UE_LOG(LogTemp, Warning, TEXT("AirplanePawn: Start Location=%s"), *GetActorLocation().ToString());
-
 	// Hide the Blueprint's cube mesh (it's still root for physics)
 	PlaneMesh->SetVisibility(false);
 
-	// Create visual cone at runtime (Blueprint can't override this)
-	UStaticMesh* ConeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
-	if (ConeMesh)
-	{
-		UStaticMeshComponent* VisualMesh = NewObject<UStaticMeshComponent>(this, TEXT("VisualMesh"));
-		VisualMesh->SetupAttachment(PlaneMesh);
-		VisualMesh->SetStaticMesh(ConeMesh);
-		// Cone points +Z by default, rotate so tip points +X (forward)
-		VisualMesh->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
-		VisualMesh->SetRelativeScale3D(FVector(1.0f, 1.0f, 2.0f));
-		VisualMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		VisualMesh->RegisterComponent();
-	}
+	// Build airplane from primitives at runtime
+	BuildAirplaneVisual();
 
 	// Force camera setup (override Blueprint-saved values)
 	if (SpringArm)
@@ -138,6 +120,10 @@ void AAirplanePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 			EnhancedInput->BindAction(RollAction, ETriggerEvent::Triggered, this, &AAirplanePawn::HandleRoll);
 			EnhancedInput->BindAction(RollAction, ETriggerEvent::Completed, this, &AAirplanePawn::ResetRoll);
 		}
+		if (PauseAction)
+		{
+			EnhancedInput->BindAction(PauseAction, ETriggerEvent::Started, this, &AAirplanePawn::HandlePause);
+		}
 	}
 }
 
@@ -179,4 +165,72 @@ void AAirplanePawn::ResetYaw(const FInputActionValue& Value)
 void AAirplanePawn::ResetRoll(const FInputActionValue& Value)
 {
 	RollInput = 0.0f;
+}
+
+void AAirplanePawn::HandlePause(const FInputActionValue& Value)
+{
+	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
+	if (GM)
+	{
+		GM->TogglePause();
+	}
+}
+
+UStaticMeshComponent* AAirplanePawn::CreatePart(const FName& Name, UStaticMesh* Mesh,
+	const FVector& Location, const FRotator& Rotation, const FVector& Scale, const FLinearColor& Color)
+{
+	UStaticMeshComponent* Comp = NewObject<UStaticMeshComponent>(this, Name);
+	Comp->SetupAttachment(PlaneMesh);
+	Comp->SetStaticMesh(Mesh);
+	Comp->SetRelativeLocation(Location);
+	Comp->SetRelativeRotation(Rotation);
+	Comp->SetRelativeScale3D(Scale);
+	Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(
+		Comp->GetMaterial(0), this);
+	Mat->SetVectorParameterValue(TEXT("BaseColor"), Color);
+	Comp->SetMaterial(0, Mat);
+
+	Comp->RegisterComponent();
+	return Comp;
+}
+
+void AAirplanePawn::BuildAirplaneVisual()
+{
+	UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	UStaticMesh* Cone = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
+
+	if (!Cylinder || !Cube || !Cone)
+		return;
+
+	FLinearColor BodyColor(0.1f, 0.3f, 0.8f);    // синий
+	FLinearColor WingColor(0.6f, 0.6f, 0.65f);    // серый
+	FLinearColor TailColor(0.8f, 0.1f, 0.1f);     // красный
+	FLinearColor NoseColor(0.9f, 0.9f, 0.2f);     // жёлтый
+
+	// Фюзеляж — цилиндр, лежит вдоль X
+	CreatePart(TEXT("Fuselage"), Cylinder,
+		FVector(0, 0, 0), FRotator(0, 0, 90), FVector(0.5f, 0.5f, 1.5f), BodyColor);
+
+	// Нос — конус, направлен вперёд (+X)
+	CreatePart(TEXT("Nose"), Cone,
+		FVector(170, 0, 0), FRotator(-90, 0, 0), FVector(0.5f, 0.5f, 0.7f), NoseColor);
+
+	// Главные крылья — два плоских куба по бокам
+	CreatePart(TEXT("WingLeft"), Cube,
+		FVector(0, -120, 0), FRotator(0, 0, 0), FVector(0.6f, 2.0f, 0.04f), WingColor);
+	CreatePart(TEXT("WingRight"), Cube,
+		FVector(0, 120, 0), FRotator(0, 0, 0), FVector(0.6f, 2.0f, 0.04f), WingColor);
+
+	// Хвостовое оперение — вертикальный стабилизатор
+	CreatePart(TEXT("TailFin"), Cube,
+		FVector(-140, 0, 40), FRotator(0, 0, 0), FVector(0.4f, 0.04f, 0.6f), TailColor);
+
+	// Горизонтальные стабилизаторы хвоста
+	CreatePart(TEXT("TailWingLeft"), Cube,
+		FVector(-140, -40, 0), FRotator(0, 0, 0), FVector(0.3f, 0.7f, 0.04f), TailColor);
+	CreatePart(TEXT("TailWingRight"), Cube,
+		FVector(-140, 40, 0), FRotator(0, 0, 0), FVector(0.3f, 0.7f, 0.04f), TailColor);
 }
