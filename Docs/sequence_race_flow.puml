@@ -1,0 +1,83 @@
+@startuml Race Flow Sequence
+
+skinparam sequenceMessageAlign center
+
+actor Player
+participant "AAirplanePawn" as Pawn
+participant "AAiBotPawn" as Bot
+participant "AAiBotController" as BotCtrl
+participant "ACheckpointActor" as CP
+participant "AAirRaceGameMode" as GM
+participant "ARaceHUD" as HUD
+
+== Initialization ==
+
+GM -> GM : BeginPlay()
+GM -> GM : SpawnCheckpoints() [5 gates]
+GM -> GM : CollectCheckpoints()
+GM -> CP : SetHighlight(true) [checkpoint 0]
+GM -> GM : SpawnGroundPlane()
+GM -> GM : SpawnWaterPlane()
+GM -> GM : SpawnTrees() [60 trees]
+GM -> GM : RaceState = MainMenu
+
+== Main Menu ==
+
+HUD -> HUD : DrawMainMenu()
+Player -> HUD : Click "PLAY"
+HUD -> GM : StartRace()
+GM -> GM : RaceState = Racing
+GM -> GM : SpawnAIBots() [3 bots]
+GM -> Bot : SpawnActor (Alpha, Bravo, Charlie)
+GM -> BotCtrl : Possess(Bot)
+
+== Gameplay Loop (each frame) ==
+
+Player -> Pawn : Input (WASD/Arrows/Mouse)
+Pawn -> Pawn : Tick(): update speed,\nrotation, position
+
+BotCtrl -> BotCtrl : Tick(): dot-product steering
+BotCtrl -> Bot : SetThrottle/Pitch/Yaw/Roll
+Bot -> Bot : Tick(): update speed,\nrotation, position
+
+GM -> GM : Tick(): RaceTime += DeltaTime
+HUD -> GM : read RaceState, Lap, Time,\nStandings, Position
+HUD -> Pawn : GetCurrentSpeed()
+HUD -> HUD : DrawRaceHUD()
+
+== Checkpoint Reached (Player) ==
+
+Pawn -> CP : overlap trigger
+CP -> GM : OnCheckpointReached(Plane, Index)
+
+alt Index == NextCheckpointIndex
+  GM -> GM : NextCheckpointIndex++
+
+  alt All checkpoints passed (lap complete)
+    GM -> GM : CurrentLap++, update BestLapTime
+
+    alt CurrentLap > TotalLaps
+      GM -> GM : RaceState = Finished
+      HUD -> HUD : DrawFinishScreen()
+    end
+  end
+
+  GM -> CP : UpdateCheckpointHighlights()
+else Wrong checkpoint
+  GM -> GM : ignore
+end
+
+== Checkpoint Reached (Bot) ==
+
+Bot -> CP : overlap trigger
+CP -> GM : OnBotCheckpointReached(Bot, Index)
+GM -> GM : Bot.NextCheckpointIndex++
+
+== Pause ==
+
+Player -> Pawn : ESC
+Pawn -> GM : TogglePause()
+GM -> GM : RaceState = Paused
+HUD -> HUD : DrawPauseMenu()
+
+@enduml

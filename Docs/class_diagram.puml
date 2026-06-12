@@ -1,0 +1,138 @@
+@startuml AirRacer Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 14
+
+package "AirRacer" {
+
+  enum ERaceState {
+    MainMenu
+    Racing
+    Paused
+    Finished
+  }
+
+  class AAirplanePawn <<Pawn>> {
+    - PlaneMesh : UStaticMeshComponent*
+    - SpringArm : USpringArmComponent*
+    - Camera : UCameraComponent*
+    - DefaultMappingContext : UInputMappingContext*
+    - ThrottleAction : UInputAction*
+    - PitchAction : UInputAction*
+    - YawAction : UInputAction*
+    - RollAction : UInputAction*
+    - PauseAction : UInputAction*
+    - MaxSpeed : float = 3000
+    - MinSpeed : float = 500
+    - CurrentSpeed : float
+    --
+    + GetCurrentSpeed() : float
+    + Tick(DeltaTime) : void
+    + SetupPlayerInputComponent() : void
+    + PossessedBy(Controller) : void
+    - BuildAirplaneVisual() : void
+    - CreatePart(...) : UStaticMeshComponent*
+  }
+
+  class AAiBotPawn <<Pawn>> {
+    - BotMesh : UStaticMeshComponent*
+    - MinSpeed : float
+    - MaxSpeed : float
+    - CurrentSpeed : float
+    + NextCheckpointIndex : int32
+    + CurrentLap : int32
+    + bFinished : bool
+    + BotName : FString
+    --
+    + Tick(DeltaTime) : void
+    + SetSpeedLimits(Min, Max) : void
+    + SetThrottleInput(Val) : void
+    + SetPitchInput(Val) : void
+    + SetYawInput(Val) : void
+    + SetRollInput(Val) : void
+    - BuildBotVisual() : void
+  }
+
+  class AAiBotController <<AIController>> {
+    - BotPawn : AAiBotPawn*
+    --
+    + Tick(DeltaTime) : void
+    + OnPossess(Pawn) : void
+  }
+
+  class AAirRaceGameMode <<GameModeBase>> {
+    + RaceState : ERaceState
+    + TotalCheckpoints : int32 = 5
+    + TotalLaps : int32 = 3
+    + CurrentLap : int32
+    + RaceTime : float
+    + BestLapTime : float
+    + AIBots : TArray<AAiBotPawn*>
+    - Checkpoints : TArray<ACheckpointActor*>
+    --
+    + StartRace() : void
+    + TogglePause() : void
+    + RestartRace() : void
+    + QuitGame() : void
+    + OnCheckpointReached(Plane, Index) : void
+    + OnBotCheckpointReached(Bot, Index) : void
+    + GetPlayerPosition() : int32
+    + GetRaceStandings() : TArray<FRacerInfo>
+    - SpawnCheckpoints() : void
+    - SpawnAIBots() : void
+    - SpawnGroundPlane() : void
+    - SpawnWaterPlane() : void
+    - SpawnTrees() : void
+    - CollectCheckpoints() : void
+    - HideBrokenLandscape() : void
+  }
+
+  class ACheckpointActor <<Actor>> {
+    + CheckpointIndex : int32
+    + TriggerBox : UBoxComponent*
+    + RingMesh : UStaticMeshComponent*
+    - HighlightLight : UPointLightComponent*
+    - GateSpheres : TArray<UStaticMeshComponent*>
+    --
+    + SetHighlight(bActive) : void
+    - OnOverlapBegin(...) : void
+  }
+
+  class ARaceHUD <<HUD>> {
+    - bMousePressed : bool
+    - bWasMouseDown : bool
+    --
+    + DrawHUD() : void
+    - DrawRaceHUD() : void
+    - DrawMainMenu() : void
+    - DrawPauseMenu() : void
+    - DrawFinishScreen() : void
+    - DrawButton(...) : bool
+  }
+
+  class AGroundPlane <<Actor>> {
+    - MeshComp : UStaticMeshComponent*
+    --
+    + BeginPlay() : void
+  }
+
+}
+
+AAirRaceGameMode --> AAirplanePawn : DefaultPawnClass
+AAirRaceGameMode --> ARaceHUD : HUDClass
+AAirRaceGameMode "1" o-- "0..*" ACheckpointActor : spawns & collects
+AAirRaceGameMode "1" o-- "0..3" AAiBotPawn : spawns
+AAirRaceGameMode "1" o-- "1" AGroundPlane : spawns
+AAirRaceGameMode --> ERaceState : state machine
+
+AAiBotController --> AAiBotPawn : possesses & steers
+AAiBotController ..> ACheckpointActor : navigates toward
+
+ACheckpointActor --> AAirRaceGameMode : OnCheckpointReached()
+ACheckpointActor ..> AAirplanePawn : overlap detection
+ACheckpointActor ..> AAiBotPawn : overlap detection
+
+ARaceHUD ..> AAirRaceGameMode : reads race state
+ARaceHUD ..> AAirplanePawn : reads speed
+
+@enduml
