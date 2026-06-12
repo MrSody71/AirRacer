@@ -67,4 +67,11 @@ private:
 	void CollectCheckpoints();
 	void UpdateCheckpointHighlights();
 	void SpawnGroundPlane();
+	void HideBrokenLandscape();
+	void HideLandscapesNow();
+	void SpawnWaterPlane();
+	void SpawnTrees();
+
+	bool bHidingLandscapes = false;
+	float HideLandscapeTimer = 0.0f;
 };

@@ -26,8 +26,8 @@ void AGroundPlane::BeginPlay()
 	if (CubeMesh)
 	{
 		MeshComp->SetStaticMesh(CubeMesh);
-		// Flat cube: 500x500 wide, very thin (0.01 height)
-		SetActorScale3D(FVector(500.0f, 500.0f, 0.01f));
+		// Green island: 600x600, thin
+		SetActorScale3D(FVector(600.0f, 600.0f, 0.01f));
 
 		// Green ground material
 		UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr,
