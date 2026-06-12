@@ -1,0 +1,18 @@
+[project]
+name = "air-racer-rl"
+version = "0.1.0"
+description = "RL training environment for AirRacer airplane racing game"
+requires-python = ">=3.10"
+dependencies = [
+    "gymnasium>=0.29",
+    "stable-baselines3>=2.1",
+    "scipy",
+    "numpy",
+    "torch>=2.0",
+    "onnx",
+    "onnxruntime",
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
