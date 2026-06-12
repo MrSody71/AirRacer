@@ -1,0 +1,28 @@
+# UE5 generated
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Backup/
+.vs/
+.vsconfig
+*.sln
+UpgradeLog.htm
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Python
+python/__pycache__/
+python/.venv/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ONNX models (large binaries)
+*.onnx
+
+# IDE
+.idea/
+.vscode/
