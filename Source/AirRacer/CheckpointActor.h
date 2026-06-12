@@ -6,6 +6,7 @@
 
 class UBoxComponent;
 class UStaticMeshComponent;
+class UPointLightComponent;
 
 UCLASS()
 class AIRRACER_API ACheckpointActor : public AActor
@@ -24,6 +25,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UStaticMeshComponent* RingMesh;
 
+	/** Highlight this checkpoint as the next target */
+	void SetHighlight(bool bActive);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -31,4 +35,8 @@ protected:
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
 		bool bFromSweep, const FHitResult& SweepResult);
+
+private:
+	UPROPERTY()
+	UPointLightComponent* HighlightLight = nullptr;
 };

@@ -5,6 +5,7 @@
 #include "AirRaceGameMode.generated.h"
 
 class AAirplanePawn;
+class ACheckpointActor;
 
 UCLASS()
 class AIRRACER_API AAirRaceGameMode : public AGameModeBase
@@ -43,4 +44,11 @@ protected:
 
 private:
 	float LapStartTime = 0.0f;
+
+	UPROPERTY()
+	TArray<ACheckpointActor*> Checkpoints;
+
+	void CollectCheckpoints();
+	void UpdateCheckpointHighlights();
+	void SpawnGroundPlane();
 };

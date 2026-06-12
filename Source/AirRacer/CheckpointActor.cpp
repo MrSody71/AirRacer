@@ -3,6 +3,7 @@
 #include "AirplanePawn.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/PointLightComponent.h"
 
 ACheckpointActor::ACheckpointActor()
 {
@@ -14,35 +15,76 @@ ACheckpointActor::ACheckpointActor()
 	TriggerBox->SetBoxExtent(FVector(200.0f, 800.0f, 800.0f));
 	TriggerBox->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	TriggerBox->SetGenerateOverlapEvents(true);
-	TriggerBox->SetHiddenInGame(false);
-	TriggerBox->ShapeColor = FColor::Green;
-	TriggerBox->SetLineThickness(5.0f);
+	TriggerBox->SetHiddenInGame(true);
 
-	// Visual ring mesh
+	// Blueprint visual mesh (will be hidden at runtime)
 	RingMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RingMesh"));
 	RingMesh->SetupAttachment(TriggerBox);
 	RingMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	RingMesh->SetRelativeScale3D(FVector(8.0f, 8.0f, 8.0f));
 }
 
 void ACheckpointActor::BeginPlay()
 {
 	Super::BeginPlay();
 	TriggerBox->OnComponentBeginOverlap.AddDynamic(this, &ACheckpointActor::OnOverlapBegin);
+
+	// Hide ALL existing mesh components (Blueprint may have saved extras)
+	TArray<UStaticMeshComponent*> MeshComps;
+	GetComponents<UStaticMeshComponent>(MeshComps);
+	for (UStaticMeshComponent* Comp : MeshComps)
+	{
+		Comp->SetVisibility(false);
+	}
+
+	// Create gate ring from spheres dynamically (Blueprint can't override this)
+	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (SphereMesh)
+	{
+		// Create a ring of spheres to form a visible gate
+		const int32 NumSpheres = 12;
+		const float RingRadius = 600.0f;
+		for (int32 i = 0; i < NumSpheres; i++)
+		{
+			float Angle = (2.0f * PI * i) / NumSpheres;
+			FVector Offset(0.0f, FMath::Cos(Angle) * RingRadius, FMath::Sin(Angle) * RingRadius);
+
+			FString Name = FString::Printf(TEXT("GateSphere_%d"), i);
+			UStaticMeshComponent* SphereComp = NewObject<UStaticMeshComponent>(this, *Name);
+			SphereComp->SetupAttachment(TriggerBox);
+			SphereComp->SetStaticMesh(SphereMesh);
+			SphereComp->SetRelativeLocation(Offset);
+			SphereComp->SetRelativeScale3D(FVector(1.5f, 1.5f, 1.5f));
+			SphereComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			SphereComp->RegisterComponent();
+		}
+	}
+
+	// Create highlight lights dynamically (bright, visible from far)
+	HighlightLight = NewObject<UPointLightComponent>(this, TEXT("HighlightLight"));
+	HighlightLight->SetupAttachment(TriggerBox);
+	HighlightLight->SetRelativeLocation(FVector::ZeroVector);
+	HighlightLight->SetIntensity(500000.0f);
+	HighlightLight->SetAttenuationRadius(5000.0f);
+	HighlightLight->SetLightColor(FLinearColor(0.0f, 1.0f, 0.2f));
+	HighlightLight->SetVisibility(false);
+	HighlightLight->RegisterComponent();
+}
+
+void ACheckpointActor::SetHighlight(bool bActive)
+{
+	if (HighlightLight)
+	{
+		HighlightLight->SetVisibility(bActive);
+	}
 }
 
 void ACheckpointActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
 	bool bFromSweep, const FHitResult& SweepResult)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Overlap with: %s"), *OtherActor->GetName());
-
 	AAirplanePawn* Plane = Cast<AAirplanePawn>(OtherActor);
 	if (!Plane)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Not an airplane, ignoring"));
 		return;
-	}
 
 	UE_LOG(LogTemp, Warning, TEXT("Checkpoint %d reached!"), CheckpointIndex);
 
@@ -50,9 +92,5 @@ void ACheckpointActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActo
 	if (GM)
 	{
 		GM->OnCheckpointReached(Plane, CheckpointIndex);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("GameMode is not AirRaceGameMode!"));
 	}
 }
