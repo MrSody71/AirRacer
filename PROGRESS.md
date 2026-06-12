@@ -7,28 +7,36 @@
 - **Project path:** C:\AirRacer\AirRacer\
 - **UE Editor language:** Russian
 
-## Current Status: Day 1 COMPLETE (2026-06-12)
+## Current Status: Day 2 COMPLETE (2026-06-12)
 
-### DONE:
+### DONE (Day 1):
 - [x] UE 5.6 C++ project created
 - [x] Git repo + GitHub remote (MrSody71/AirRacer)
 - [x] MSVC v14.38 + .NET Framework 4.6.2 DevPack configured
 - [x] AirplanePawn (C++) — flight physics, Enhanced Input, camera (SpringArm)
 - [x] Input Actions: IA_Throttle, IA_Pitch, IA_Yaw, IA_Roll (Axis1D float)
 - [x] IMC_Flight mapping: W/S=газ, Arrows=тангаж, A/D=рыскание, Q/E=крен
-- [x] BP_Airplane blueprint — inputs assigned, Cube mesh placeholder, Auto Possess Player 0
-- [x] CheckpointActor (C++) — trigger box (800x800), overlap detection, debug logging
+- [x] BP_Airplane blueprint — inputs assigned, Auto Possess Player 0
+- [x] CheckpointActor (C++) — trigger box (800x800), overlap detection
 - [x] AirRaceGameMode (C++) — lap counter (3 laps), timer, checkpoint tracking (5 checkpoints)
 - [x] BP_Checkpoint blueprint — 5 штук размещены на уровне (indices 0-4)
-- [x] GameMode set via DefaultEngine.ini (GlobalDefaultGameMode)
-- [x] RaceLevel saved in Content/
-- [x] Player can fly and complete laps, logs confirm checkpoint detection
+- [x] GameMode set via DefaultEngine.ini
+- [x] UML diagrams — Docs/class_diagram.puml, Docs/sequence_race_flow.puml
 
-### TODO (Day 2): HUD + Track
-- [ ] HUD widget (speed, lap, time, next checkpoint indicator)
-- [ ] Improve race track (landscape or platforms, visual markers)
-- [ ] Airplane mesh replacement (вместо куба)
-- [ ] UML diagrams (PlantUML)
+### DONE (Day 2):
+- [x] RaceHUD (Canvas-based) — speed, lap, timer, best lap, checkpoint counter
+- [x] Mouse flight controls (pitch + yaw via GetInputMouseDelta)
+- [x] Q/E roll fix (ETriggerEvent::Completed handlers for key release)
+- [x] IA_Pause + ESC key for pause menu
+- [x] Main Menu screen (PLAY / QUIT buttons)
+- [x] Pause Menu screen (RESUME / QUIT buttons)
+- [x] Finish Screen (total time, best lap, RESTART / QUIT)
+- [x] Race state machine: ERaceState (MainMenu → Racing → Paused → Finished)
+- [x] Colored airplane model from primitives (fuselage, nose, wings, tail)
+- [x] Colored checkpoint rings (12 spheres, green=active, gray=inactive)
+- [x] Environment: green island ground plane + blue ocean + 60 procedural trees
+- [x] Hidden broken Open World landscape/HLOD/cloud artifacts
+- [x] Dynamic materials via BasicShapeMaterial + "Color" parameter
 
 ### TODO (Day 3): Python RL
 - [ ] Python RL environment (gymnasium) — 2D race simulation
@@ -55,24 +63,22 @@
 - [ ] Presentation (10 slides)
 
 ## Key Files:
-- `Source/AirRacer/AirplanePawn.h/cpp` — Player airplane pawn
-- `Source/AirRacer/CheckpointActor.h/cpp` — Race checkpoint with trigger
-- `Source/AirRacer/AirRaceGameMode.h/cpp` — Race logic (laps, timer)
-- `Content/Input/` — IA_Throttle, IA_Pitch, IA_Yaw, IA_Roll, IMC_Flight
+- `Source/AirRacer/AirplanePawn.h/cpp` — Player airplane pawn (flight, mouse controls, visual model)
+- `Source/AirRacer/CheckpointActor.h/cpp` — Race checkpoint (sphere ring, highlight, overlap)
+- `Source/AirRacer/AirRaceGameMode.h/cpp` — Race logic, state machine, environment spawning
+- `Source/AirRacer/RaceHUD.h/cpp` — Canvas HUD + menus (main, pause, finish)
+- `Source/AirRacer/GroundPlane.h/cpp` — Green island ground plane
+- `Content/Input/` — IA_Throttle, IA_Pitch, IA_Yaw, IA_Roll, IA_Pause, IMC_Flight
 - `Content/BP_Airplane.uasset` — Player blueprint
 - `Content/BP_Checkpoint.uasset` — Checkpoint blueprint
 - `Content/RaceLevel.umap` — Main race level
-- `Config/DefaultEngine.ini` — GameMode config
+- `Docs/` — UML diagrams (class_diagram.puml, sequence_race_flow.puml)
 
-## UE Editor Notes:
-- UE 5.6, Editor in Russian
-- BP_Airplane: Auto Possess Player = Player 0
-- Static Mesh: /Engine/BasicShapes/Cube (placeholder)
-- Live Coding (Ctrl+Alt+F11) for code changes, but restart UE for constructor changes
-- "Класс Blueprint" в русской локализации может называться "Схема Blueprint"
-- "Настройки мира" не найдены в UI — используем DefaultEngine.ini напрямую
-
-## Build Notes:
-- MSVC v14.38 set in BuildConfiguration.xml
-- .NET Framework 4.6.2 DevPack required for SwarmInterface
-- Memory pressure during builds — 16GB RAM is tight, builds limited to 2 parallel
+## Technical Notes:
+- Dynamic materials: use `/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial` with "Color" param
+- Landscape hiding: Open World template landscape is broken (checkerboard), hidden at runtime via Tick
+- Canvas HUD chosen over UMG widgets (more reliable without Blueprint setup)
+- Mouse input: APlayerController::GetInputMouseDelta() in Tick, sensitivity = 10.0
+- Editor requires `-DDC-ForceMemoryCache` flag to launch
+- Live Coding blocks external builds — editor must be closed for builds
+- Landscape module added to Build.cs for ALandscapeProxy iteration
