@@ -1,4 +1,5 @@
 #include "AiBotPawn.h"
+#include "AirRaceGameMode.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -35,6 +36,11 @@ void AAiBotPawn::BeginPlay()
 void AAiBotPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// Only move when racing
+	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
+	if (GM && GM->RaceState != ERaceState::Racing)
+		return;
 
 	if (bFinished)
 		return;

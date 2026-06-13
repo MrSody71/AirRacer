@@ -2,6 +2,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 
 AGroundPlane::AGroundPlane()
 {
@@ -35,8 +36,27 @@ void AGroundPlane::BeginPlay()
 		if (BaseMat)
 		{
 			UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(BaseMat, this);
-			Mat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.15f, 0.45f, 0.1f));
+
+			// Log available vector parameters for debugging
+			TArray<FMaterialParameterInfo> VecParams;
+			TArray<FGuid> VecGuids;
+			Mat->GetAllVectorParameterInfo(VecParams, VecGuids);
+			for (const FMaterialParameterInfo& P : VecParams)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("GroundPlane: Material has vector param: '%s'"), *P.Name.ToString());
+			}
+
+			// Try both common parameter names
+			FLinearColor Green(0.15f, 0.45f, 0.1f);
+			Mat->SetVectorParameterValue(TEXT("Color"), Green);
+			Mat->SetVectorParameterValue(TEXT("BaseColor"), Green);
+			Mat->SetVectorParameterValue(TEXT("Base Color"), Green);
 			MeshComp->SetMaterial(0, Mat);
+			UE_LOG(LogTemp, Warning, TEXT("GroundPlane: Material applied, BaseMat=%s"), *BaseMat->GetName());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("GroundPlane: Failed to load BasicShapeMaterial!"));
 		}
 
 		UE_LOG(LogTemp, Warning, TEXT("GroundPlane: Mesh set OK, Location=%s Scale=%s"),

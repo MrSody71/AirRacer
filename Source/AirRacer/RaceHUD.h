@@ -25,6 +25,7 @@ private:
 	bool DrawButton(const FString& Text, float X, float Y, float W, float H, UFont* Font);
 	bool IsMouseInRect(float X, float Y, float W, float H) const;
 	bool bMousePressed = false;
+	bool bWasMouseDown = false;
 	float MouseX = 0.0f;
 	float MouseY = 0.0f;
 };

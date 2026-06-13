@@ -3,6 +3,8 @@
 #include "AirRaceGameMode.h"
 #include "AirplanePawn.h"
 #include "GameFramework/PlayerController.h"
+#include "Engine/GameViewportClient.h"
+#include "UnrealClient.h"
 
 void ARaceHUD::BeginPlay()
 {
@@ -21,12 +23,17 @@ void ARaceHUD::DrawHUD()
 	if (!GM)
 		return;
 
-	// Get mouse state
+	// Get mouse state directly from FViewport (bypasses PlayerInput, works in all build configs)
 	APlayerController* PC = GetOwningPlayerController();
-	if (PC)
+	bMousePressed = false;
+	if (GEngine && GEngine->GameViewport && GEngine->GameViewport->Viewport)
 	{
-		PC->GetMousePosition(MouseX, MouseY);
-		bMousePressed = PC->WasInputKeyJustPressed(EKeys::LeftMouseButton);
+		FViewport* Viewport = GEngine->GameViewport->Viewport;
+		MouseX = Viewport->GetMouseX();
+		MouseY = Viewport->GetMouseY();
+		bool bMouseDown = Viewport->KeyState(EKeys::LeftMouseButton);
+		bMousePressed = bMouseDown && !bWasMouseDown;
+		bWasMouseDown = bMouseDown;
 	}
 
 	switch (GM->RaceState)
@@ -74,7 +81,17 @@ void ARaceHUD::DrawMainMenu()
 	float BtnW = 250.0f, BtnH = 55.0f;
 	float BtnX = (ScreenW - BtnW) * 0.5f;
 
-	if (DrawButton(TEXT("PLAY"), BtnX, ScreenH * 0.5f, BtnW, BtnH, Font))
+	bool bStartClicked = DrawButton(TEXT("PLAY"), BtnX, ScreenH * 0.5f, BtnW, BtnH, Font);
+
+	// Also allow Enter/Space to start
+	if (GEngine && GEngine->GameViewport && GEngine->GameViewport->Viewport)
+	{
+		FViewport* VP = GEngine->GameViewport->Viewport;
+		if (VP->KeyState(EKeys::Enter) || VP->KeyState(EKeys::SpaceBar))
+			bStartClicked = true;
+	}
+
+	if (bStartClicked)
 	{
 		if (GM) GM->StartRace();
 	}

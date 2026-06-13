@@ -22,7 +22,7 @@ void AAiBotController::Tick(float DeltaTime)
 		return;
 
 	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
-	if (!GM)
+	if (!GM || GM->RaceState != ERaceState::Racing)
 		return;
 
 	const TArray<ACheckpointActor*>& Checkpoints = GM->GetCheckpoints();
