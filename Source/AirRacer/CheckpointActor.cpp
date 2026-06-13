@@ -1,6 +1,7 @@
 #include "CheckpointActor.h"
 #include "AirRaceGameMode.h"
 #include "AirplanePawn.h"
+#include "AiBotPawn.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -111,15 +112,24 @@ void ACheckpointActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActo
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
 	bool bFromSweep, const FHitResult& SweepResult)
 {
-	AAirplanePawn* Plane = Cast<AAirplanePawn>(OtherActor);
-	if (!Plane)
+	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
+	if (!GM)
 		return;
 
-	UE_LOG(LogTemp, Warning, TEXT("Checkpoint %d reached!"), CheckpointIndex);
-
-	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
-	if (GM)
+	// Player airplane
+	AAirplanePawn* Plane = Cast<AAirplanePawn>(OtherActor);
+	if (Plane)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Checkpoint %d reached by player!"), CheckpointIndex);
 		GM->OnCheckpointReached(Plane, CheckpointIndex);
+		return;
+	}
+
+	// AI bot
+	AAiBotPawn* Bot = Cast<AAiBotPawn>(OtherActor);
+	if (Bot)
+	{
+		GM->OnBotCheckpointReached(Bot, CheckpointIndex);
+		return;
 	}
 }

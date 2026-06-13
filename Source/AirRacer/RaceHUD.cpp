@@ -302,6 +302,48 @@ void ARaceHUD::DrawRaceHUD()
 		Canvas->DrawText(Font, BestText, PanelX + 20.0f, PanelY + 10.0f);
 	}
 
+	// Left side: Race Position + Standings
+	{
+		int32 Position = GM->GetPlayerPosition();
+		FString PosText = FString::Printf(TEXT("%d"), Position);
+		FString PosLabel;
+		switch (Position)
+		{
+		case 1: PosLabel = TEXT("st"); break;
+		case 2: PosLabel = TEXT("nd"); break;
+		case 3: PosLabel = TEXT("rd"); break;
+		default: PosLabel = TEXT("th"); break;
+		}
+
+		float PanelX = 20.0f;
+		float PanelY = 110.0f;
+
+		DrawBackground(PanelX, PanelY, 200.0f, 140.0f);
+
+		// Big position number
+		float PosW, PosH;
+		Canvas->StrLen(Font, PosText, PosW, PosH);
+		float PosScale = 2.0f;
+		FCanvasTextItem PosItem(
+			FVector2D(PanelX + 15.0f, PanelY + 5.0f),
+			FText::FromString(PosText + PosLabel), Font,
+			Position == 1 ? FLinearColor(1.0f, 0.9f, 0.1f) : FLinearColor::White);
+		PosItem.Scale = FVector2D(PosScale, PosScale);
+		Canvas->DrawItem(PosItem);
+
+		// Standings list
+		TArray<AAirRaceGameMode::FRacerInfo> Standings = GM->GetRaceStandings();
+		float ListY = PanelY + 55.0f;
+		for (int32 i = 0; i < Standings.Num() && i < 4; i++)
+		{
+			FString EntryText = FString::Printf(TEXT("%d. %s"), i + 1, *Standings[i].Name);
+			FColor EntryColor = Standings[i].Name == TEXT("Player") ? FColor::Yellow : FColor(180, 180, 180);
+			Canvas->DrawColor = EntryColor;
+			Canvas->DrawText(SmallFont, EntryText, PanelX + 15.0f, ListY);
+			ListY += 20.0f;
+		}
+	}
+
 	// Bottom-center: Speed
 	{
 		float Speed = Plane->GetCurrentSpeed();
