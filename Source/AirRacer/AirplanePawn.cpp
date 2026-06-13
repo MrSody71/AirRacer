@@ -6,6 +6,10 @@
 #include "EnhancedInputSubsystems.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "AirRaceGameMode.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
+#include "InputMappingContext.h"
+#include "InputAction.h"
 
 AAirplanePawn::AAirplanePawn()
 {
@@ -17,6 +21,14 @@ AAirplanePawn::AAirplanePawn()
 	PlaneMesh->SetSimulatePhysics(false);
 	PlaneMesh->SetCollisionProfileName(TEXT("Pawn"));
 	PlaneMesh->SetGenerateOverlapEvents(true);
+
+	// Assign a cube mesh so the collision component has geometry for overlaps
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeFinder(
+		TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (CubeFinder.Succeeded())
+	{
+		PlaneMesh->SetStaticMesh(CubeFinder.Object);
+	}
 
 	// Spring arm (camera boom)
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
@@ -31,13 +43,34 @@ AAirplanePawn::AAirplanePawn()
 	// Camera
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(SpringArm);
+
+	// Load input assets from C++ so they work in packaged builds (no BP dependency)
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext> IMCFinder(
+		TEXT("/Game/Input/IMC_Flight.IMC_Flight"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> ThrottleFinder(
+		TEXT("/Game/Input/IA_Throttle.IA_Throttle"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> PitchFinder(
+		TEXT("/Game/Input/IA_Pitch.IA_Pitch"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> YawFinder(
+		TEXT("/Game/Input/IA_Yaw.IA_Yaw"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> RollFinder(
+		TEXT("/Game/Input/IA_Roll.IA_Roll"));
+	static ConstructorHelpers::FObjectFinder<UInputAction> PauseFinder(
+		TEXT("/Game/Input/IA_Pause.IA_Pause"));
+
+	if (IMCFinder.Succeeded()) DefaultMappingContext = IMCFinder.Object;
+	if (ThrottleFinder.Succeeded()) ThrottleAction = ThrottleFinder.Object;
+	if (PitchFinder.Succeeded()) PitchAction = PitchFinder.Object;
+	if (YawFinder.Succeeded()) YawAction = YawFinder.Object;
+	if (RollFinder.Succeeded()) RollAction = RollFinder.Object;
+	if (PauseFinder.Succeeded()) PauseAction = PauseFinder.Object;
 }
 
 void AAirplanePawn::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Register input mapping context
+	// Try to register input mapping context (may fail if not possessed yet)
 	if (APlayerController* PC = Cast<APlayerController>(Controller))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -46,8 +79,17 @@ void AAirplanePawn::BeginPlay()
 			if (DefaultMappingContext)
 			{
 				Subsystem->AddMappingContext(DefaultMappingContext, 0);
+				UE_LOG(LogTemp, Warning, TEXT("AirplanePawn: MappingContext added in BeginPlay"));
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("AirplanePawn: DefaultMappingContext is NULL!"));
 			}
 		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AirplanePawn: No Controller in BeginPlay, will add MappingContext in PossessedBy"));
 	}
 
 	CurrentSpeed = MinSpeed;
@@ -71,6 +113,11 @@ void AAirplanePawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// Only move when racing
+	AAirRaceGameMode* GM = Cast<AAirRaceGameMode>(GetWorld()->GetAuthGameMode());
+	if (GM && GM->RaceState != ERaceState::Racing)
+		return;
+
 	// Update speed
 	CurrentSpeed += ThrottleInput * Acceleration * DeltaTime;
 	CurrentSpeed = FMath::Clamp(CurrentSpeed, MinSpeed, MaxSpeed);
@@ -92,6 +139,25 @@ void AAirplanePawn::Tick(float DeltaTime)
 	// Move forward
 	FVector ForwardMovement = GetActorForwardVector() * CurrentSpeed * DeltaTime;
 	SetActorLocation(GetActorLocation() + ForwardMovement, true);
+}
+
+void AAirplanePawn::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	// Register input mapping context after possession (in packaged builds, BeginPlay may fire before possession)
+	if (APlayerController* PC = Cast<APlayerController>(NewController))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			if (DefaultMappingContext)
+			{
+				Subsystem->AddMappingContext(DefaultMappingContext, 0);
+				UE_LOG(LogTemp, Warning, TEXT("AirplanePawn: MappingContext added in PossessedBy"));
+			}
+		}
+	}
 }
 
 void AAirplanePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
