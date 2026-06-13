@@ -7,7 +7,7 @@
 - **Project path:** C:\AirRacer\AirRacer\
 - **UE Editor language:** Russian
 
-## Current Status: Day 2 COMPLETE (2026-06-12)
+## Current Status: Day 6 IN PROGRESS (2026-06-13)
 
 ### DONE (Day 1):
 - [x] UE 5.6 C++ project created
@@ -31,47 +31,62 @@
 - [x] Main Menu screen (PLAY / QUIT buttons)
 - [x] Pause Menu screen (RESUME / QUIT buttons)
 - [x] Finish Screen (total time, best lap, RESTART / QUIT)
-- [x] Race state machine: ERaceState (MainMenu → Racing → Paused → Finished)
+- [x] Race state machine: ERaceState (MainMenu -> Racing -> Paused -> Finished)
 - [x] Colored airplane model from primitives (fuselage, nose, wings, tail)
 - [x] Colored checkpoint rings (12 spheres, green=active, gray=inactive)
 - [x] Environment: green island ground plane + blue ocean + 60 procedural trees
 - [x] Hidden broken Open World landscape/HLOD/cloud artifacts
 - [x] Dynamic materials via BasicShapeMaterial + "Color" parameter
 
-### TODO (Day 3): Python RL
-- [ ] Python RL environment (gymnasium) — 2D race simulation
-- [ ] Train PPO agent (stable-baselines3)
-- [ ] Export to ONNX
-- [ ] pytest tests for env
-- [ ] Dockerfile for training
+### DONE (Day 3):
+- [x] Python RL environment (gymnasium) — 3D airplane flight simulation
+- [x] Train PPO agent (stable-baselines3, 500K timesteps)
+- [x] Export to ONNX (airracer_bot.onnx, 2KB)
+- [x] 11 pytest tests (all passing)
+- [x] Dockerfile for training
 
-### TODO (Day 4): AI Bots in UE
-- [ ] C++ ONNX Runtime integration in UE
-- [ ] UAIBrainComponent — inference on tick
-- [ ] AAIAirplaneController + 2-3 AI bots on track
+### DONE (Day 4):
+- [x] AiBotPawn (C++) — AI airplane with flight physics, red color scheme
+- [x] AiBotController (C++) — rule-based steering via dot product targeting
+- [x] 3 AI bots with different max speeds (Alpha=2400, Bravo=2100, Charlie=1800)
+- [x] Bots spawn near player at race start, fly checkpoints autonomously
+- [x] Per-bot checkpoint/lap tracking with overlap detection
+- [x] Race position system (1st/2nd/3rd/4th) in HUD
+- [x] Live standings list showing all racers
+- [x] AIModule added to Build.cs
 
-### TODO (Day 5): Testing + Polish
-- [ ] Unit tests (pytest for Python, UE automation tests)
-- [ ] SAST (bandit, clang-tidy)
-- [ ] docker-compose.yml
-- [ ] Gameplay polish, balancing
+### DONE (Day 5):
+- [x] Unit tests (pytest, 11 tests passing)
+- [x] SAST (bandit)
+- [x] docker-compose.yml
+- [x] Packaged build fixes: C++ pawn spawn, input assets via ConstructorHelpers
+- [x] Checkpoints spawned from C++ (World Partition fix)
+- [x] HUD click detection via FViewport::KeyState
+- [x] Collision mesh for overlap detection
+- [x] Development + Shipping .exe builds working
 
-### TODO (Day 6): Documentation
-- [ ] README.md
+### DONE (Day 6):
+- [x] README.md
+- [x] PlantUML diagrams (class, sequence, C4 context, C4 container)
 - [ ] Пояснительная записка (по структуре из методички)
-- [ ] PlantUML/Mermaid diagrams (class, sequence, C4)
 - [ ] Presentation (10 slides)
+- [ ] Final Shipping build
 
 ## Key Files:
 - `Source/AirRacer/AirplanePawn.h/cpp` — Player airplane pawn (flight, mouse controls, visual model)
-- `Source/AirRacer/CheckpointActor.h/cpp` — Race checkpoint (sphere ring, highlight, overlap)
-- `Source/AirRacer/AirRaceGameMode.h/cpp` — Race logic, state machine, environment spawning
-- `Source/AirRacer/RaceHUD.h/cpp` — Canvas HUD + menus (main, pause, finish)
+- `Source/AirRacer/AiBotPawn.h/cpp` — AI airplane pawn (same physics, red scheme, configurable speed)
+- `Source/AirRacer/AiBotController.h/cpp` — AI steering logic (dot product toward checkpoints)
+- `Source/AirRacer/CheckpointActor.h/cpp` — Race checkpoint (sphere ring, highlight, overlap for player+bots)
+- `Source/AirRacer/AirRaceGameMode.h/cpp` — Race logic, state machine, bot spawning, positions, environment
+- `Source/AirRacer/RaceHUD.h/cpp` — Canvas HUD + menus + race positions
 - `Source/AirRacer/GroundPlane.h/cpp` — Green island ground plane
+- `Python/air_racer/env.py` — Gymnasium RL environment (3D flight sim)
+- `Python/air_racer/config.py` — Flight constants matching UE5
+- `Python/train.py` — PPO training script
+- `Python/export_onnx.py` — ONNX export for UE5 integration
+- `Python/airracer_bot.onnx` — Trained neural network (12 float in, 4 float out)
+- `Python/Dockerfile` — Training container
 - `Content/Input/` — IA_Throttle, IA_Pitch, IA_Yaw, IA_Roll, IA_Pause, IMC_Flight
-- `Content/BP_Airplane.uasset` — Player blueprint
-- `Content/BP_Checkpoint.uasset` — Checkpoint blueprint
-- `Content/RaceLevel.umap` — Main race level
 - `Docs/` — UML diagrams (class_diagram.puml, sequence_race_flow.puml)
 
 ## Technical Notes:
@@ -79,6 +94,8 @@
 - Landscape hiding: Open World template landscape is broken (checkerboard), hidden at runtime via Tick
 - Canvas HUD chosen over UMG widgets (more reliable without Blueprint setup)
 - Mouse input: APlayerController::GetInputMouseDelta() in Tick, sensitivity = 10.0
+- Bot overlap: BotMesh needs a StaticMesh (invisible cube) for overlap detection to work
+- Bot steering: dot product of desired direction with local axes, multiplied by 5x gain
 - Editor requires `-DDC-ForceMemoryCache` flag to launch
 - Live Coding blocks external builds — editor must be closed for builds
-- Landscape module added to Build.cs for ALandscapeProxy iteration
+- Modules: Landscape, AIModule added to Build.cs
