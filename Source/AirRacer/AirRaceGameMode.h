@@ -6,6 +6,7 @@
 
 class AAirplanePawn;
 class ACheckpointActor;
+class AAiBotPawn;
 
 UENUM()
 enum class ERaceState : uint8
@@ -25,6 +26,24 @@ public:
 	AAirRaceGameMode();
 
 	void OnCheckpointReached(AAirplanePawn* Plane, int32 CheckpointIndex);
+	void OnBotCheckpointReached(AAiBotPawn* Bot, int32 CheckpointIndex);
+
+	const TArray<ACheckpointActor*>& GetCheckpoints() const { return Checkpoints; }
+
+	// Race position tracking
+	int32 GetPlayerPosition() const;
+
+	struct FRacerInfo
+	{
+		FString Name;
+		int32 Lap;
+		int32 Checkpoint;
+		float DistToNext;
+	};
+	TArray<FRacerInfo> GetRaceStandings() const;
+
+	UPROPERTY()
+	TArray<AAiBotPawn*> AIBots;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Race")
 	int32 TotalCheckpoints = 5;
@@ -71,6 +90,7 @@ private:
 	void HideLandscapesNow();
 	void SpawnWaterPlane();
 	void SpawnTrees();
+	void SpawnAIBots();
 
 	bool bHidingLandscapes = false;
 	float HideLandscapeTimer = 0.0f;

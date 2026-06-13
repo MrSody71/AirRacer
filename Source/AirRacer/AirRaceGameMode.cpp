@@ -3,6 +3,8 @@
 #include "RaceHUD.h"
 #include "CheckpointActor.h"
 #include "GroundPlane.h"
+#include "AiBotPawn.h"
+#include "AiBotController.h"
 #include "Landscape.h"
 #include "LandscapeProxy.h"
 #include "LandscapeComponent.h"
@@ -70,6 +72,7 @@ void AAirRaceGameMode::Tick(float DeltaTime)
 void AAirRaceGameMode::StartRace()
 {
 	RaceState = ERaceState::Racing;
+	SpawnAIBots();
 	UGameplayStatics::SetGamePaused(GetWorld(), false);
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (PC)
@@ -356,4 +359,134 @@ void AAirRaceGameMode::SpawnTrees()
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("SpawnTrees: Spawned %d trees"), NumTrees);
+}
+
+TArray<AAirRaceGameMode::FRacerInfo> AAirRaceGameMode::GetRaceStandings() const
+{
+	TArray<FRacerInfo> Standings;
+
+	// Add player
+	{
+		FRacerInfo Info;
+		Info.Name = TEXT("Player");
+		Info.Lap = CurrentLap;
+		Info.Checkpoint = NextCheckpointIndex;
+		Info.DistToNext = 0.0f;
+
+		APawn* PlayerPawn = GetWorld()->GetFirstPlayerController()->GetPawn();
+		if (PlayerPawn && Checkpoints.Num() > 0)
+		{
+			int32 CpIdx = FMath::Clamp(NextCheckpointIndex, 0, Checkpoints.Num() - 1);
+			Info.DistToNext = FVector::Dist(PlayerPawn->GetActorLocation(), Checkpoints[CpIdx]->GetActorLocation());
+		}
+		Standings.Add(Info);
+	}
+
+	// Add bots
+	for (const AAiBotPawn* Bot : AIBots)
+	{
+		if (!Bot) continue;
+		FRacerInfo Info;
+		Info.Name = Bot->BotName;
+		Info.Lap = Bot->CurrentLap;
+		Info.Checkpoint = Bot->NextCheckpointIndex;
+		Info.DistToNext = 0.0f;
+
+		if (Checkpoints.Num() > 0)
+		{
+			int32 CpIdx = FMath::Clamp(Bot->NextCheckpointIndex, 0, Checkpoints.Num() - 1);
+			Info.DistToNext = FVector::Dist(Bot->GetActorLocation(), Checkpoints[CpIdx]->GetActorLocation());
+		}
+		Standings.Add(Info);
+	}
+
+	// Sort: higher lap first, then more checkpoints, then closer to next checkpoint
+	Standings.Sort([](const FRacerInfo& A, const FRacerInfo& B)
+	{
+		if (A.Lap != B.Lap) return A.Lap > B.Lap;
+		if (A.Checkpoint != B.Checkpoint) return A.Checkpoint > B.Checkpoint;
+		return A.DistToNext < B.DistToNext;
+	});
+
+	return Standings;
+}
+
+int32 AAirRaceGameMode::GetPlayerPosition() const
+{
+	TArray<FRacerInfo> Standings = GetRaceStandings();
+	for (int32 i = 0; i < Standings.Num(); i++)
+	{
+		if (Standings[i].Name == TEXT("Player"))
+			return i + 1;
+	}
+	return 1;
+}
+
+void AAirRaceGameMode::SpawnAIBots()
+{
+	UWorld* World = GetWorld();
+	if (!World || Checkpoints.Num() == 0)
+		return;
+
+	// Spawn bots near the player, staggered
+	APawn* PlayerPawn = World->GetFirstPlayerController()->GetPawn();
+	FVector PlayerPos = PlayerPawn ? PlayerPawn->GetActorLocation() : FVector(0, 0, 1000.0f);
+	FRotator PlayerRot = PlayerPawn ? PlayerPawn->GetActorRotation() : FRotator::ZeroRotator;
+	FRotator LevelRot(0.0f, PlayerRot.Yaw, 0.0f);
+	FVector FwdDir = LevelRot.Vector();
+	FVector Right = FVector::CrossProduct(FVector::UpVector, FwdDir).GetSafeNormal();
+
+	// Different speed limits per bot (slower than player's max)
+	struct FBotConfig { FString Name; float MaxSpd; float SideOff; float BackOff; };
+	TArray<FBotConfig> BotConfigs = {
+		{ TEXT("Bot Alpha"), 2400.0f, 400.0f, 200.0f },
+		{ TEXT("Bot Bravo"), 2100.0f, -400.0f, 400.0f },
+		{ TEXT("Bot Charlie"), 1800.0f, 800.0f, 600.0f },
+	};
+
+	for (int32 i = 0; i < BotConfigs.Num(); i++)
+	{
+		FVector SpawnPos = PlayerPos - FwdDir * BotConfigs[i].BackOff + Right * BotConfigs[i].SideOff;
+		SpawnPos.Z = FMath::Max(SpawnPos.Z, 500.0f);
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		AAiBotPawn* Bot = World->SpawnActor<AAiBotPawn>(SpawnPos, LevelRot, SpawnParams);
+		if (Bot)
+		{
+			Bot->SetSpeedLimits(500.0f, BotConfigs[i].MaxSpd);
+			Bot->BotName = BotConfigs[i].Name;
+			AAiBotController* BotController = World->SpawnActor<AAiBotController>();
+			if (BotController)
+			{
+				BotController->Possess(Bot);
+			}
+			AIBots.Add(Bot);
+			UE_LOG(LogTemp, Warning, TEXT("SpawnAIBots: %s spawned (MaxSpeed=%.0f)"), *Bot->BotName, BotConfigs[i].MaxSpd);
+		}
+	}
+}
+
+void AAirRaceGameMode::OnBotCheckpointReached(AAiBotPawn* Bot, int32 CheckpointIndex)
+{
+	if (!Bot || Bot->bFinished)
+		return;
+
+	if (CheckpointIndex != Bot->NextCheckpointIndex)
+		return;
+
+	Bot->NextCheckpointIndex++;
+
+	if (Bot->NextCheckpointIndex >= TotalCheckpoints)
+	{
+		Bot->CurrentLap++;
+		Bot->NextCheckpointIndex = 0;
+
+		if (Bot->CurrentLap > TotalLaps)
+		{
+			Bot->bFinished = true;
+			UE_LOG(LogTemp, Warning, TEXT("AI Bot finished the race!"));
+		}
+	}
 }
