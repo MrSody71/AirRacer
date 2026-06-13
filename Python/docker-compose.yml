@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python train.py --timesteps 500000 --n-envs 4 --output /app/output/ppo_airracer
+    volumes:
+      - ./output:/app/output
+      - ./tb_logs:/app/tb_logs
+
+  export:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python export_onnx.py --model /app/output/ppo_airracer --output /app/output/airracer_bot.onnx
+    volumes:
+      - ./output:/app/output
+    depends_on:
+      train:
+        condition: service_completed_successfully
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m pytest tests/ -v
+    volumes:
+      - ./tests:/app/tests
