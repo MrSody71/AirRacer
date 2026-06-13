@@ -26,3 +26,6 @@ python/.venv/
 # IDE
 .idea/
 .vscode/
+
+# Local progress tracking
+PROGRESS.md
