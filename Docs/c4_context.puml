@@ -1,0 +1,19 @@
+@startuml C4 Context Diagram
+
+!include <C4/C4_Context>
+
+title AirRacer — C4 Context Diagram
+
+Person(player, "Игрок", "Управляет самолётом,\nпроходит чекпоинты,\nсоревнуется с ИИ-ботами")
+
+System(game, "AirRacer Game", "UE5.6 C++ приложение.\nАвиагонка с ИИ-противниками,\nчекпоинтами и 3 кругами")
+
+System_Ext(rl, "RL Training Pipeline", "Python + Gymnasium +\nstable-baselines3.\nОбучение PPO-агента,\nэкспорт в ONNX")
+
+System_Ext(docker, "Docker", "Контейнеризация\nRL обучения")
+
+Rel(player, game, "Играет", "клавиатура + мышь")
+Rel(rl, game, "Экспортирует модель", "ONNX файл")
+Rel(docker, rl, "Запускает обучение", "docker compose")
+
+@enduml

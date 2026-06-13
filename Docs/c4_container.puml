@@ -1,0 +1,37 @@
+@startuml C4 Container Diagram
+
+!include <C4/C4_Container>
+
+title AirRacer — C4 Container Diagram
+
+Person(player, "Игрок")
+
+System_Boundary(game_boundary, "AirRacer Game (UE5.6)") {
+  Container(gamemode, "AirRaceGameMode", "C++", "Логика гонки, спавн,\nсостояния, позиции")
+  Container(pawn, "AirplanePawn", "C++", "Пешка игрока:\nполёт, ввод, камера")
+  Container(bot, "AiBotPawn +\nAiBotController", "C++", "ИИ-боты: навигация\ndot-product к чекпоинтам")
+  Container(checkpoint, "CheckpointActor", "C++", "Ворота: триггер,\nкольцо из сфер")
+  Container(hud, "RaceHUD", "C++ Canvas", "HUD: скорость, круг,\nтаймер, меню, позиция")
+  Container(env, "GroundPlane +\nWater + Trees", "C++", "Процедурный мир\nиз примитивов")
+}
+
+System_Boundary(rl_boundary, "RL Training Pipeline") {
+  Container(gym_env, "Gymnasium Env", "Python", "3D среда полёта,\nнаблюдения + награды")
+  Container(train, "PPO Training", "Python, SB3", "Обучение 500K шагов")
+  Container(onnx, "ONNX Export", "Python", "Экспорт модели\nв .onnx формат")
+}
+
+Rel(player, pawn, "Управляет", "WASD/Mouse")
+Rel(player, hud, "Видит", "Canvas")
+Rel(gamemode, pawn, "Спавнит", "DefaultPawnClass")
+Rel(gamemode, bot, "Спавнит 3 шт.", "SpawnAIBots()")
+Rel(gamemode, checkpoint, "Спавнит 5 шт.", "SpawnCheckpoints()")
+Rel(gamemode, env, "Спавнит", "BeginPlay()")
+Rel(pawn, checkpoint, "Пролетает", "Overlap")
+Rel(bot, checkpoint, "Пролетает", "Overlap")
+Rel(checkpoint, gamemode, "Оповещает", "OnCheckpointReached()")
+Rel(hud, gamemode, "Читает состояние", "RaceState, Time")
+Rel(train, gym_env, "Использует", "step()/reset()")
+Rel(train, onnx, "Экспортирует", ".onnx")
+
+@enduml
