@@ -91,6 +91,7 @@ private:
 	void SpawnWaterPlane();
 	void SpawnTrees();
 	void SpawnAIBots();
+	void SpawnCheckpoints();
 
 	bool bHidingLandscapes = false;
 	float HideLandscapeTimer = 0.0f;

@@ -16,12 +16,21 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "UObject/ConstructorHelpers.h"
 
 AAirRaceGameMode::AAirRaceGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	DefaultPawnClass = nullptr;
+	DefaultPawnClass = AAirplanePawn::StaticClass();
 	HUDClass = ARaceHUD::StaticClass();
+
+	// Force-reference engine assets so the cooker includes them in packaged builds.
+	// All other classes use LoadObject() which is invisible to the cooker.
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeRef(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderRef(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> ConeRef(TEXT("/Engine/BasicShapes/Cone.Cone"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereRef(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MatRef(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 }
 
 void AAirRaceGameMode::BeginPlay()
@@ -35,6 +44,7 @@ void AAirRaceGameMode::BeginPlay()
 	BestLapTime = 0.0f;
 	RaceState = ERaceState::MainMenu;
 
+	SpawnCheckpoints();
 	CollectCheckpoints();
 	HideBrokenLandscape();
 	SpawnGroundPlane();
@@ -43,11 +53,24 @@ void AAirRaceGameMode::BeginPlay()
 
 	GetWorldTimerManager().SetTimerForNextTick(this, &AAirRaceGameMode::UpdateCheckpointHighlights);
 
-	// Show main menu: pause game, show cursor
-	UGameplayStatics::SetGamePaused(GetWorld(), true);
+	// Move player pawn to starting position in the air
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (PC)
 	{
+		APawn* PlayerPawn = PC->GetPawn();
+		if (PlayerPawn)
+		{
+			// Start at center, facing first checkpoint (positive X)
+			PlayerPawn->SetActorLocation(FVector(0.0f, 0.0f, 1000.0f));
+			PlayerPawn->SetActorRotation(FRotator(0.0f, 0.0f, 0.0f));
+			UE_LOG(LogTemp, Warning, TEXT("GameMode: Moved player pawn to start position"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("GameMode: No player pawn after BeginPlay!"));
+		}
+
+		// Show main menu: show cursor (no SetGamePaused — it blocks input in packaged builds)
 		PC->bShowMouseCursor = true;
 		PC->SetInputMode(FInputModeGameAndUI());
 	}
@@ -73,7 +96,6 @@ void AAirRaceGameMode::StartRace()
 {
 	RaceState = ERaceState::Racing;
 	SpawnAIBots();
-	UGameplayStatics::SetGamePaused(GetWorld(), false);
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (PC)
 	{
@@ -87,7 +109,6 @@ void AAirRaceGameMode::TogglePause()
 	if (RaceState == ERaceState::Racing)
 	{
 		RaceState = ERaceState::Paused;
-		UGameplayStatics::SetGamePaused(GetWorld(), true);
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		if (PC)
 		{
@@ -98,7 +119,6 @@ void AAirRaceGameMode::TogglePause()
 	else if (RaceState == ERaceState::Paused)
 	{
 		RaceState = ERaceState::Racing;
-		UGameplayStatics::SetGamePaused(GetWorld(), false);
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		if (PC)
 		{
@@ -464,6 +484,47 @@ void AAirRaceGameMode::SpawnAIBots()
 			}
 			AIBots.Add(Bot);
 			UE_LOG(LogTemp, Warning, TEXT("SpawnAIBots: %s spawned (MaxSpeed=%.0f)"), *Bot->BotName, BotConfigs[i].MaxSpd);
+		}
+	}
+}
+
+void AAirRaceGameMode::SpawnCheckpoints()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+		return;
+
+	// Circuit of 5 checkpoints around the island at flight altitude
+	// Island radius ~30000 units, race circuit ~15000 unit radius
+	struct FCheckpointDef { FVector Location; FRotator Rotation; };
+	const float CircuitRadius = 15000.0f;
+	const float AltitudeBase = 1000.0f;
+
+	TArray<FCheckpointDef> Defs;
+	for (int32 i = 0; i < TotalCheckpoints; i++)
+	{
+		float Angle = (2.0f * PI * i) / TotalCheckpoints;
+		// Vary altitude to make the race more interesting
+		float Alt = AltitudeBase + FMath::Sin(Angle * 2.0f) * 500.0f;
+		FVector Pos(FMath::Cos(Angle) * CircuitRadius, FMath::Sin(Angle) * CircuitRadius, Alt);
+
+		// Gate faces the next checkpoint direction (tangent to circle)
+		float NextAngle = (2.0f * PI * ((i + 1) % TotalCheckpoints)) / TotalCheckpoints;
+		FVector NextPos(FMath::Cos(NextAngle) * CircuitRadius, FMath::Sin(NextAngle) * CircuitRadius, Alt);
+		FRotator Rot = (NextPos - Pos).Rotation();
+
+		Defs.Add({ Pos, Rot });
+	}
+
+	for (int32 i = 0; i < Defs.Num(); i++)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ACheckpointActor* CP = World->SpawnActor<ACheckpointActor>(Defs[i].Location, Defs[i].Rotation, SpawnParams);
+		if (CP)
+		{
+			CP->CheckpointIndex = i;
+			UE_LOG(LogTemp, Warning, TEXT("SpawnCheckpoints: CP %d at %s"), i, *Defs[i].Location.ToString());
 		}
 	}
 }
