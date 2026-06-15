@@ -8,7 +8,8 @@ public class AirRacer : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "Slate", "SlateCore", "Landscape", "AIModule" });
+		// Добавлен "NNE" — Neural Network Engine (API для инференса ONNX-модели в C++)
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "Slate", "SlateCore", "Landscape", "AIModule", "NNE" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
