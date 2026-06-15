@@ -1,4 +1,8 @@
-"""Export trained PPO model to ONNX for UE5 integration."""
+"""Export trained PPO model to ONNX for UE5 integration.
+
+No VecNormalize — observations are already well-scaled by design,
+so the C++ side feeds raw observations directly.
+"""
 
 import argparse
 

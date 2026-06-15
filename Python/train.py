@@ -16,8 +16,8 @@ def make_env():
 
 def main():
     parser = argparse.ArgumentParser(description="Train AirRacer PPO agent")
-    parser.add_argument("--timesteps", type=int, default=500_000, help="Total training timesteps")
-    parser.add_argument("--n-envs", type=int, default=4, help="Number of parallel environments")
+    parser.add_argument("--timesteps", type=int, default=8_000_000, help="Total training timesteps")
+    parser.add_argument("--n-envs", type=int, default=8, help="Number of parallel environments")
     parser.add_argument("--output", type=str, default="ppo_airracer", help="Output model path")
     args = parser.parse_args()
 
@@ -29,12 +29,13 @@ def main():
         verbose=1,
         learning_rate=3e-4,
         n_steps=2048,
-        batch_size=64,
+        batch_size=512,
         n_epochs=10,
-        gamma=0.99,
+        gamma=0.995,
         gae_lambda=0.95,
         clip_range=0.2,
-        ent_coef=0.01,
+        ent_coef=0.005,
+        policy_kwargs=dict(net_arch=[256, 256]),
         tensorboard_log="./tb_logs/",
     )
 
